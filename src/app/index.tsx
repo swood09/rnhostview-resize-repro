@@ -1,98 +1,58 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { Host, RNHostView, ScrollView, VStack } from '@expo/ui/swift-ui';
+import { Animation, animation, background, frame } from '@expo/ui/swift-ui/modifiers';
+import { Link } from 'expo-router';
+import { useState } from 'react';
+import { Button, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ReactNativeCard, SwiftUICard } from '@/components/cards';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+/**
+ * Any iPhone or iPad simulator. Both cards sit in a SwiftUI frame whose width
+ * animates (`animation(_:value:)`, 0.8s ease-in-out) when the button is tapped.
+ *
+ * Expected: both cards resize smoothly with the frame.
+ * Actual: the SwiftUI card interpolates every frame; the React Native card inside
+ * `RNHostView` jumps to its FINAL layout at the start, and only its outer frame
+ * animates (photo, text wrap and button snap first, then slide into place).
+ */
+export default function AnimatedWidth() {
+  const [wide, setWide] = useState(false);
+  const width = wide ? 360 : 200;
+  const resize = [
+    frame({ width, height: 260 }),
+    background('#f2f2f7'),
+    animation(Animation.easeInOut({ duration: 0.8 }), wide),
+  ];
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
-
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+    <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
+      <View style={styles.controls}>
+        <Button title={wide ? 'Make narrow' : 'Make wide'} onPress={() => setWide((w) => !w)} />
+        <Link href="/arrangement" style={styles.link}>
+          iPhone Duo: ArrangementView →
+        </Link>
+      </View>
+      <Host style={styles.host}>
+        <ScrollView>
+        <VStack alignment="leading" spacing={16}>
+          <VStack modifiers={resize}>
+            <SwiftUICard />
+          </VStack>
+          <VStack modifiers={resize}>
+            <RNHostView>
+              <ReactNativeCard />
+            </RNHostView>
+          </VStack>
+        </VStack>
+        </ScrollView>
+      </Host>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+  root: { flex: 1, backgroundColor: '#fff' },
+  controls: { padding: 16, gap: 8 },
+  link: { color: '#007aff', fontSize: 15 },
+  host: { flex: 1, marginHorizontal: 16 },
 });

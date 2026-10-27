@@ -1,56 +1,61 @@
-# Welcome to your Expo app 👋
+# `RNHostView` content snaps to its final size during an animated SwiftUI resize
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+When SwiftUI animates the size of a view that contains an `@expo/ui` `RNHostView`, the
+hosted React Native content does not animate with it. It lays out at its **final** size at
+the start of the animation, and only the outer frame animates. Images, wrapping text and
+buttons visibly jump, then slide into place. The same content built in SwiftUI interpolates
+smoothly, frame by frame.
 
-## Get started
+It is most visible on the iPhone Duo, where `ArrangementView` animates its two sides at the
+fold, but it reproduces on any simulator with an ordinary animated `frame`.
 
-1. Install dependencies
+## Versions
 
-   ```bash
-   npm install
-   ```
+| | |
+|---|---|
+| expo | 58.0.19 |
+| @expo/ui | 58.0.23 |
+| react-native | 0.88.0 |
+| Xcode | 27.2 (27B48) |
 
-2. Start the app
+## Run it
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```sh
+npm install
+npx expo prebuild -p ios
+cd ios && pod install && cd ..
+npx expo run:ios
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+`package.json` builds `ExpoFileSystem` and `ExpoUI` from source
+(`expo.autolinking.buildFromSource`). Without it, the stock template crashes at launch in
+dyld: the precompiled `ExpoFileSystem.framework` references an `ExpoModulesCore`
+`EventEmitter.eventRuntime` symbol the bundled `ExpoModulesCore` does not export. That is a
+separate problem; `ExpoUI` is built from source so `RNHostView` compiles from the version
+under test.
 
-### Other setup steps
+### Screen 1: Animated width (any iPhone or iPad simulator)
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Two copies of the same card (the same photo, a title, body text and a full-width button), one
+built in SwiftUI and one in React Native inside `RNHostView`, sit in
+SwiftUI frames whose width animates between 200 and 360 points over 0.8s
+(`animation(Animation.easeInOut({ duration: 0.8 }), wide)`). Tap **Make wide** / **Make narrow**.
 
-## Learn more
+- **Expected:** both cards resize smoothly.
+- **Actual:** the SwiftUI card (top) interpolates. The React Native card in `RNHostView`
+  (bottom) jumps to its final layout immediately (the photo, the text wrap and the button
+  change size in one frame), and only its frame animates.
 
-To learn more about developing your project with Expo, look at the following resources:
+### Screen 2: ArrangementView (iPhone Duo, iOS 27.1+)
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Tap **iPhone Duo: ArrangementView**. On the inner display in landscape, fold into book pose
+and back to flat. The SwiftUI side resizes smoothly; the React Native side snaps to its
+final size while the arrangement animates around it.
 
-## Join the community
+## Why
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+`RNHostView` reports its size to the React Native shadow node from
+`onGeometryChange` (`ios/RNHostView.swift`, `ReportSizeToYogaNodeModifier`). During an
+animated layout change SwiftUI reports only the destination geometry, once, so Yoga lays the
+hosted tree out at its final size before the animation runs, and nothing reports the
+intermediate sizes.
